@@ -1,0 +1,3 @@
+2 types de parties :
+Partie simple : Autant de calcul possible avec erreur possible pendant un laps de temps défini
+Partie try hard : Temps total de la partie illimité, mais 3 secondes maximum pour répondre à chaque calcul sinon fin de la partie.

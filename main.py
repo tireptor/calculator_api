@@ -2,10 +2,14 @@ from flask import Flask, render_template,request,jsonify,make_response
 from flask_restful import Api, Resource, reqparse, abort, fields, marshal_with
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy.orm import relationship, backref,joinedload
 import uuid
 import jwt
 import datetime
 from functools import wraps
+
+from sqlalchemy import Table, Column, Integer, ForeignKey
+from sqlalchemy.ext.declarative import declarative_base
 
 app = Flask(__name__)
 api = Api(app)
@@ -20,7 +24,8 @@ class UserModel(db.Model):
 	userName = db.Column(db.String(100), nullable=False)
 	userPsw = db.Column(db.String(100), nullable=False)
 	userAdmin = db.Column(db.Boolean)
-	scores = db.relationship('ScoreModel', backref='userModel', lazy=True)
+	#scores = db.relationship('ScoreModel', backref='player', lazy=True)
+	scores = db.relationship('ScoreModel', back_populates='player', lazy=True)
 
 	#def __repr__(self):
 	#	return f"User(userId = {userId}, userName = {userName}, userPsw = {userPsw}, userPublicId = {userPublicId})"
@@ -31,6 +36,7 @@ class ScoreModel(db.Model):
 	scoreValue = db.Column(db.Integer, nullable=False)
 	scoreTime = db.Column(db.Integer, nullable=False)
 	userId = db.Column(db.Integer, db.ForeignKey('t_user.userId'),nullable=False)
+	player = db.relationship('UserModel', back_populates='scores', lazy=True)
 
 	def __repr__(self):
 		return f"Score(scoreId = {scoreId}, scoreValue = {scoreValue}, scoreTime = {scoreTime}, userId = {userId})"
@@ -57,15 +63,25 @@ user_resource_fields = {
 	'userId': fields.Integer,
 	'userName': fields.String,
 	'userPsw': fields.String,
-	'public_id': fields.String,
-	'admin': fields.Boolean,
+	'userPublicId': fields.String,
+	'userAdmin': fields.Boolean,
 	'token' : fields.String
 }
 score_resource_fields = {
 	'scoreId': fields.Integer,
 	'scoreValue': fields.Integer,
 	'scoreTime': fields.Integer,
-	'userId': fields.Integer
+	'userId': fields.Integer,
+	'player' : fields.Nested(user_resource_fields)
+}
+user_resource_fields = {
+	'userId': fields.Integer,
+	'userName': fields.String,
+	'userPsw': fields.String,
+	'userPublicId': fields.String,
+	'userAdmin': fields.Boolean,
+	'token' : fields.String,
+	'scores' : fields.Nested(score_resource_fields)
 }
 
 # Fonction TOKEN
@@ -108,15 +124,16 @@ class LoginUser(Resource):
 			#return jsonify({'token' : token.decode('UTF-8')})
 			return make_response(jsonify({'token' : token.decode('UTF-8')}),  201)
 		return make_response('could not verify',  401, {'WWW.Authentication': 'Basic realm: "login required"'})
-
-
+	@token_required
+	def put(self,test):
+		return make_response(jsonify({'userName' : self.userName}),  201)
 class RegisterUser(Resource):
 	@marshal_with(user_resource_fields)
 	def put(self):
 		args = user_put_args.parse_args()
 		result = UserModel.query.filter_by(userName=args['userName']).first()
 		if result:
-			abort(409, message="User taken...")
+			abort(409, message="Utilisateur déjà existant ...")
 		isAdmin = False
 		if args['userAdmin']:
 			isAdmin = args['userAdmin']
@@ -144,7 +161,6 @@ class RegisterUser(Resource):
 		if args['userPsw']:
 			hashed_password = generate_password_hash(args['userPsw'], method='sha256')
 			result.userPsw = hashed_password
-
 		db.session.commit()
 		print("OK")
 		return result
@@ -152,9 +168,16 @@ class RegisterUser(Resource):
 class Score(Resource):
 	@marshal_with(score_resource_fields)
 	def get(self):
+		#result = ScoreModel.query.filter_by(name)
+		#result = ScoreModel.query.filter_by(scoreId='1').first()
 		result = ScoreModel.query.all()
 		if not result:
 			abort(404, message="Impossible d'afficher le score !")
+		if result == None:
+			abort(404, message="Impossible d'afficher le score !")
+		print (result[1].scoreValue)
+		print (result[1].player.userName)
+		#return make_response(result,201)
 		return result
 	#@marshal_with(score_resource_fields)
 	@token_required
@@ -166,9 +189,20 @@ class Score(Resource):
 		return make_response('OK',201)
 		#return score, 201
 
+class User(Resource):
+	#@token_required
+	@marshal_with(user_resource_fields)
+	def get(self):
+		result = UserModel.query.all()
+		print(result[1].userName)
+		print(result[1].userPublicId)
+		return result
+		#return make_response(jsonify({'userName' : self.userName}),  201)
+
 api.add_resource(LoginUser, "/login")
 api.add_resource(RegisterUser, "/register")
 api.add_resource(Score, "/score")
+api.add_resource(User, "/user")
 
 @app.route('/')
 def index():
