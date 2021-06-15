@@ -38,8 +38,8 @@ class ScoreModel(db.Model):
 	userId = db.Column(db.Integer, db.ForeignKey('t_user.userId'),nullable=False)
 	player = db.relationship('UserModel', back_populates='scores', lazy=True)
 
-	def __repr__(self):
-		return f"Score(scoreId = {scoreId}, scoreValue = {scoreValue}, scoreTime = {scoreTime}, userId = {userId})"
+	#def __repr__(self):
+		#return f"Score(scoreId = {scoreId}, scoreValue = {scoreValue}, scoreTime = {scoreTime}, userId = {userId})"
 
 user_put_args = reqparse.RequestParser()
 user_put_args.add_argument("userName", type=str, help="Nom de l'utilisateur", required=True)
@@ -58,6 +58,10 @@ score_put_args.add_argument("scoreValue", type=int, help="Valeur du score", requ
 score_put_args.add_argument("scoreTime", type=int, help="Temps de la partie", required=True)
 score_put_args.add_argument("scoreId", type=int, help="Id score", required=False)
 score_put_args.add_argument("userId", type=int, help="Id de l'utilisateur", required=True)
+
+score_patch_args = reqparse.RequestParser()
+score_patch_args.add_argument("scoreValue", type=int, help="Valeur du score", required=True)
+#score_patch_args.add_argument("scoreTime", type=int, help="Temps de la partie", required=True)
 
 user_resource_fields = {
 	'userId': fields.Integer,
@@ -119,7 +123,7 @@ class LoginUser(Resource):
 		if user == None :
 			return make_response('Utilisateur inconnu !',  401, {'WWW.Authentication': 'Basic realm: "login required"'})
 		if check_password_hash(user.userPsw, auth.password):
-			token = jwt.encode({'userPublicId': user.userPublicId, 'exp' : datetime.datetime.utcnow() + datetime.timedelta(minutes=30)}, app.config['SECRET_KEY']) 
+			token = jwt.encode({'userPublicId': user.userPublicId, 'exp' : datetime.datetime.utcnow() + datetime.timedelta(hours=720)}, app.config['SECRET_KEY']) 
 			print("Le contenu de token est : ",token, " et il est de type : ",type(token))
 			#return jsonify({'token' : token.decode('UTF-8')})
 			return make_response(jsonify({'token' : token.decode('UTF-8')}),  201)
@@ -188,7 +192,24 @@ class Score(Resource):
 		db.session.commit()
 		return make_response('OK',201)
 		#return score, 201
-
+	#@marshal_with(score_resource_fields)
+	@token_required
+	def patch(self,test):
+		#print(self.userName)
+		#print(self.scores[0].scoreValue)
+		args = score_patch_args.parse_args()
+		result = ScoreModel.query.filter_by(userId=self.userId).first()
+		if not result:
+			score = ScoreModel(scoreValue=args['scoreValue'], scoreTime="100",userId=self.userId)
+			db.session.add(score)
+			db.session.commit()
+			return make_response('FIRST SCORE',200)
+			#abort(404, message="User doesn't exist, cannot update")
+		if args['scoreValue'] > result.scoreValue:
+			result.scoreValue = args['scoreValue']
+			db.session.commit()
+			return make_response('NEW BETTER SCORE',200)
+		return make_response('N/A',201)
 class User(Resource):
 	#@token_required
 	@marshal_with(user_resource_fields)
