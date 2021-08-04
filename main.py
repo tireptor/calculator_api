@@ -14,7 +14,7 @@ from sqlalchemy.ext.declarative import declarative_base
 app = Flask(__name__)
 api = Api(app)
 app.config['SECRET_KEY']='Th1s1ss3cr3t'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:fitelec@localhost:5433/calculationGenerator'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:fitelec@localhost:5432/calculationGenerator'
 db = SQLAlchemy(app)
 
 class UserModel(db.Model):
