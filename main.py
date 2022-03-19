@@ -1,6 +1,7 @@
 from flask import Flask, render_template,request,jsonify,make_response
 from flask_restful import Api, Resource, reqparse, abort, fields, marshal_with
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.sql.schema import UniqueConstraint
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.orm import relationship, backref,joinedload
 import uuid
@@ -24,8 +25,10 @@ class UserModel(db.Model):
 	userName = db.Column(db.String(100), nullable=False)
 	userPsw = db.Column(db.String(100), nullable=False)
 	userAdmin = db.Column(db.Boolean)
+	cash = db.Column(db.Integer)
 	#scores = db.relationship('ScoreModel', backref='player', lazy=True)
 	scores = db.relationship('ScoreModel', back_populates='player', lazy=True)
+	activeThemeId = db.Column(db.Integer, db.ForeignKey('t_user_object.userObjectId'),nullable=True)
 
 	#def __repr__(self):
 	#	return f"User(userId = {userId}, userName = {userName}, userPsw = {userPsw}, userPublicId = {userPublicId})"
@@ -41,17 +44,37 @@ class ScoreModel(db.Model):
 	#def __repr__(self):
 		#return f"Score(scoreId = {scoreId}, scoreValue = {scoreValue}, scoreTime = {scoreTime}, userId = {userId})"
 
+class UserObjectModel(db.Model):
+	__tablename__ = "t_user_object"
+	userObjectId = db.Column(db.Integer, primary_key=True,autoincrement=True)
+	objectName = db.Column(db.String(100))
+	objectType = db.Column(db.String(100))
+	attribut1 = db.Column(db.Integer)
+	attribut2 = db.Column(db.Integer)
+	attribut3 = db.Column(db.Integer)
+	attribut4 = db.Column(db.Integer)
+	attribut5 = db.Column(db.Integer)
+	attribut6 = db.Column(db.Integer)
+	userId = db.Column(db.Integer, db.ForeignKey('t_user.userId'),nullable=False)
+
+class SetupModel(db.Model):
+	__tablename__ = "t_setup"
+	currentVersion 	= db.Column(db.String(10))
+	apkLink 		= db.Column(db.String(200))
+
 user_put_args = reqparse.RequestParser()
 user_put_args.add_argument("userName", type=str, help="Nom de l'utilisateur", required=True)
 user_put_args.add_argument("userPsw", type=str, help="Mot de passe", required=True)
 user_put_args.add_argument("userAdmin", type=bool, help="Administrateur", required=False)
 user_put_args.add_argument("userPublicId", type=str, help="ID public", required=False)
 user_put_args.add_argument("userId", type=int, help="Id de l'utilisateur", required=False)
+user_put_args.add_argument("cash", type=int, help="Argent total de l'utilisateur", required=False)
 
 user_update_args = reqparse.RequestParser()
 user_update_args.add_argument("userName", type=str, help="User Name is required")
 user_update_args.add_argument("userPsw", type=str, help="Views of the video")
 user_update_args.add_argument("userId", type=int, help="Id de l'utilisateur",required=True)
+user_update_args.add_argument("cash", type=int, help="Argent total de l'utilisateur", required=False)
 
 score_put_args = reqparse.RequestParser()
 score_put_args.add_argument("scoreValue", type=int, help="Valeur du score", required=True)
@@ -63,13 +86,20 @@ score_patch_args = reqparse.RequestParser()
 score_patch_args.add_argument("scoreValue", type=int, help="Valeur du score", required=True)
 #score_patch_args.add_argument("scoreTime", type=int, help="Temps de la partie", required=True)
 
+user_object_post_args = reqparse.RequestParser()
+user_object_post_args.add_argument("objectName", type=str, help="Nom de l'objet", required=True)
+user_object_post_args.add_argument("objectType", type=str, help="Type de l'objet", required=True)
+user_object_post_args.add_argument("userId", type=int, help="Id de l'utilisateur", required=True)
+
 user_resource_fields = {
 	'userId': fields.Integer,
 	'userName': fields.String,
 	'userPsw': fields.String,
 	'userPublicId': fields.String,
 	'userAdmin': fields.Boolean,
-	'token' : fields.String
+	"cash" : fields.Integer,
+	'token' : fields.String,
+	'activeThemeId' : fields.Integer
 }
 score_resource_fields = {
 	'scoreId': fields.Integer,
@@ -84,8 +114,33 @@ user_resource_fields = {
 	'userPsw': fields.String,
 	'userPublicId': fields.String,
 	'userAdmin': fields.Boolean,
+	"cash" : fields.Integer,
 	'token' : fields.String,
+	'activeThemeId' : fields.Integer,
 	'scores' : fields.Nested(score_resource_fields)
+}
+
+user_object_resource_fields = {
+	'userObjectId': fields.Integer,
+	'objectName': fields.String,
+	'objectType': fields.String,
+	'attribut1': fields.Integer,
+	'attribut2': fields.Integer,
+	'attribut3': fields.Integer,
+	'attribut4': fields.Integer,
+	'attribut5': fields.Integer,
+	'attribut6': fields.Integer,
+	'userId': fields.Integer
+}
+
+setup_resource_fields = {
+	'currentVersion' : fields.String,
+	'apkLink' : fields.String
+}
+
+user_active_theme_resource_fields = {
+	'userObjectId': fields.Integer,
+	'objectName': fields.String
 }
 
 # Fonction TOKEN
@@ -130,7 +185,7 @@ class LoginUser(Resource):
 		return make_response('could not verify',  401, {'WWW.Authentication': 'Basic realm: "login required"'})
 	@token_required
 	def put(self,test):
-		return make_response(jsonify({'userName' : self.userName}),  201)
+		return make_response(jsonify({'userName' : self.userName,'cash' : self.cash, 'userId' : self.userId}),  201)
 class RegisterUser(Resource):
 	@marshal_with(user_resource_fields)
 	def put(self):
@@ -151,6 +206,7 @@ class RegisterUser(Resource):
 	@marshal_with(user_resource_fields)
 	@token_required
 	def patch(self,test):
+		print("Entrée dans le patch")
 		print(self.userPublicId)
 		args = user_update_args.parse_args()
 		print("Args : ",args)
@@ -165,6 +221,8 @@ class RegisterUser(Resource):
 		if args['userPsw']:
 			hashed_password = generate_password_hash(args['userPsw'], method='sha256')
 			result.userPsw = hashed_password
+		if args['cash']:
+			result.cash = args['cash'] + result.cash
 		db.session.commit()
 		print("OK")
 		return result
@@ -220,10 +278,47 @@ class User(Resource):
 		return result
 		#return make_response(jsonify({'userName' : self.userName}),  201)
 
+class UserObject(Resource):
+	@token_required
+	def post(self,test):
+		args = user_object_post_args.parse_args()
+		userObject = UserObjectModel(objectName=args['objectName'], objectType=args['objectType'], userId=args['userId'])
+		db.session.add(userObject)
+		db.session.commit()
+		return make_response('OK',201)
+	@token_required
+	@marshal_with(user_object_resource_fields)
+	def get(self,test):
+		result = UserObjectModel.query.filter_by(userId=self.userId)
+		return result
+
+class Setup(Resource):
+	@marshal_with(setup_resource_fields)
+	def get(self):
+		result = SetupModel.query.first()
+		return result
+class ActiveUserTheme(Resource):
+	@token_required
+	@marshal_with(user_object_resource_fields)
+	def get(self,test):
+		result = UserObject.query.filter_by(userObjectId=self.activeThemeId)
+		return result
+	@token_required
+	#@marshal_with(user_resource_fields)
+	#TODO : Fonction patch à développer ! 
+	def patch(self,test):
+		result = ScoreModel.query.filter_by(userId=self.userId).first()
+		if not result:
+			return
+		return
+
 api.add_resource(LoginUser, "/login")
 api.add_resource(RegisterUser, "/register")
 api.add_resource(Score, "/score")
 api.add_resource(User, "/user")
+api.add_resource(UserObject, "/object_user")
+api.add_resource(Setup, "/setup")
+api.add_resource(ActiveUserTheme, "/active_user_theme")
 
 @app.route('/')
 def index():

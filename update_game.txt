@@ -5,3 +5,8 @@ Partie try hard : Temps total de la partie illimité, mais 3 secondes maximum po
 TODO :
 Ajout du score si il s'agit du meilleur score du joueur.
 Voir pour le faire côté python directement, certenement plus rapide et simple
+
+Intégrer une monnaie au jeu pour récompenser le joueur après une partie.
+Ajouter de éléments à acheter, Totem multicouleur (avec couleurs générées aléatoirement)
+Boite mystère
+Personnalisation du jeu, thème etc...
