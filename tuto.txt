@@ -1,0 +1,46 @@
+Prérequis :
+
+Python 3.8
+Pip
+
+Pour utiliser pip sous windows lorsqu'il n'est pas dans le path : py -m pip
+
+Exemple d'installation d'un package : py -m pip install SQLAlchemy
+py -m pip install psycopg2
+
+[Bug]
+Les variables de type SQLAlchemy peuvent être mal interprétées par VS Code, il faut alors modifier la conf : 
+https://stackoverflow.com/questions/53975234/instance-of-sqlalchemy-has-no-column-member-no-member
+
+[Installations des dépendances du fichier requirements.txt]
+pip install -r requirements.txt
+
+Astuce tuto :
+
+Pour générer la base de données sans exécuter le script python, il est possible depuis l'interpréteur python de faire ceci :
+
+"from main import db"  => main est le nom du fichier de script python qui contient la variable db.
+"db.create_all()" => une fois la variable db importée, il suffit de saisir la commande create_all()
+
+------Environnement de développement python sur Windows--------------
+Création de l'environnement virtuel dans le répertoire choisi 
+py -m venv my_env
+Activation
+tutorial-env\Scripts\activate.bat
+Installation des dépendances pour cet environnement
+pip install -r requirements.txt
+py -c "import flask; print(flask.__version__)"
+On indique à Flask où trouver le fichier d'entrée de notre application et il est ensuite possible de démarrer l'app avec la commande flask run.
+set FLASK_APP=main
+set FLASK_ENV=development
+flask run
+
+----------Tuto application de base avec Flask---------------------------
+https://www.digitalocean.com/community/tutorials/how-to-make-a-web-application-using-flask-in-python-3-fr
+
+----------Tuto déploiement d'un serveur de production avec FLASK---------------------
+https://www.digitalocean.com/community/tutorials/how-to-serve-flask-applications-with-gunicorn-and-nginx-on-ubuntu-18-04
+https://flask.palletsprojects.com/en/1.1.x/deploying/
+
+----------Tuto authentication token FLASK-------------------------------
+https://geekflare.com/fr/securing-flask-api-with-jwt/
