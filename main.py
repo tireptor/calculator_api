@@ -59,6 +59,7 @@ class UserObjectModel(db.Model):
 
 class SetupModel(db.Model):
 	__tablename__ = "t_setup"
+	setupId = db.Column(db.Integer, primary_key=True,autoincrement=True)
 	currentVersion 	= db.Column(db.String(10))
 	apkLink 		= db.Column(db.String(200))
 
